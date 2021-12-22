@@ -1,3 +1,5 @@
+import argparse
+
 from utils import *
 import matplotlib.pyplot as plt
 import numpy as np
@@ -325,46 +327,97 @@ def diagonal(res, Eg, Eu):
     coefs_mat = [Eu-3, Eg-2, Eu-1, Eg, Eu+1, Eg+2, Eu+3]
     return np.dot(exps, coefs_mat)
 
-def real_cost_function(thetas, shots, t, mu, E, width, dist, D, alpha, r_0, t_0, backend):
+def sim_cost_function(thetas, shots, t, mu, E, width, dist, D, alpha, r_0, t_0):
     qcs, qcs_z = get_all_qcs(thetas)
     Eg = morse_pot(dist, D, alpha, r_0)
     Eu = morse_pot_u(dist, D, alpha, r_0, t_0)
-    off_exps = [res_process_exp(r, shots) for r in ibmsim_real(qcs, backend, shots)]
-    dia_exps = [res_process_exp_z(r, shots) for r in ibmsim(qcs_z, backend, shots)]
+    off_exps = [res_process_exp(r, shots) for r in ibmsim(qcs, shots)]
+    dia_exps = [res_process_exp_z(r, shots) for r in ibmsim(qcs_z, shots)]
     states_exps_ = []
     for i in range(len(dia_exps)):
         states_exps_.append(offdiagonal(off_exps[i:(i+1)*10], t, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
     ssvqe_coefs = [1, 0.5, 0.3, 0.2, 0.1, 0.05, 0.02]
     return np.dot(states_exps_, ssvqe_coefs)
 
-global states_exps
-states_exps = []
-def callback(thetas):
+def real_cost_function(thetas, shots, t, mu, E, width, dist, D, alpha, r_0, t_0):
+    backend = provider.get_backend("ibm_kawasaki")
     qcs, qcs_z = get_all_qcs(thetas)
-    Eg = morse_pot(dist,  2.79, 0.72/0.7, 2*0.7)
-    Eu = morse_pot_u(dist,  2.79, 0.72/0.7, 2*0.7, -0.15)
-    off_exps = [res_process_exp(r, 10000) for r in ibmsim(qcs, 10000)]
-    dia_exps = [res_process_exp_z(r, 10000) for r in ibmsim(qcs_z, 10000)]
+    Eg = morse_pot(dist, D, alpha, r_0)
+    Eu = morse_pot_u(dist, D, alpha, r_0, t_0)
+    off_exps = [res_process_exp(r, shots) for r in ibmsim_real(qcs, backend, shots)]
+    dia_exps = [res_process_exp_z(r, shots) for r in ibmsim_real(qcs_z, backend, shots)]
+    states_exps_ = []
+    for i in range(len(dia_exps)):
+        states_exps_.append(offdiagonal(off_exps[i:(i+1)*10], t, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
+    ssvqe_coefs = [1, 0.5, 0.3, 0.2, 0.1, 0.05, 0.02]
+    return np.dot(states_exps_, ssvqe_coefs)
+
+def noisesim_cost_function(thetas, shots, t, mu, E, width, dist, D, alpha, r_0, t_0):
+    device = provider.get_backend("ibm_kawasaki")
+    noise_model = NoiseModel.from_backend(device)
+    simulator = Aer.get_backend('qasm_simulator')
+    qcs, qcs_z = get_all_qcs(thetas)
+    Eg = morse_pot(dist, D, alpha, r_0)
+    Eu = morse_pot_u(dist, D, alpha, r_0, t_0)
+    off_exps = [res_process_exp(r, shots) for r in ibmKawasaki_sim(qcs, simulator, noise_model, shots)]
+    dia_exps = [res_process_exp_z(r, shots) for r in ibmKawasaki_sim(qcs_z, simulator, noise_model, shots)]
+    states_exps_ = []
+    for i in range(len(dia_exps)):
+        states_exps_.append(offdiagonal(off_exps[i:(i+1)*10], t, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
+    ssvqe_coefs = [1, 0.5, 0.3, 0.2, 0.1, 0.05, 0.02]
+    return np.dot(states_exps_, ssvqe_coefs)
+
+def get_otptimized_exps(thetas, _type, shots, t, mu, E, width, dist, D, alpha, r_0, t_0):
+    states_exps = []
+    qcs, qcs_z = get_all_qcs(thetas)
+    Eg = morse_pot(dist, D, alpha, r_0)
+    Eu = morse_pot_u(dist, D, alpha, r_0, t_0)
+    if _type == "simulator":
+        off_exps = [res_process_exp(r, shots) for r in ibmsim(qcs, shots)]
+        dia_exps = [res_process_exp_z(r, shots) for r in ibmsim(qcs_z, shots)]
+    elif _type == "noise_simulator":
+        device = provider.get_backend("ibm_kawasaki")
+        noise_model = NoiseModel.from_backend(device)
+        simulator = Aer.get_backend('qasm_simulator')
+        off_exps = [res_process_exp(r, shots) for r in ibmKawasaki_sim(qcs, simulator, noise_model, shots)]
+        dia_exps = [res_process_exp_z(r, shots) for r in ibmKawasaki_sim(qcs_z, simulator, noise_model, shots)]
+    elif _type == "real":
+        backend = "ibm_kawasaki"
+        off_exps = [res_process_exp(r, shots) for r in ibmsim_real(qcs, backend, shots)]
+        dia_exps = [res_process_exp_z(r, shots) for r in ibmsim_real(qcs_z, backend, shots)]
     for i in range(len(dia_exps)):
         states_exps.append(offdiagonal(off_exps[i:(i+1)*10], 0, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
+    return states_exps
 
-def main(distance, ts, mu, E, width, shots, backend, gpath):
+def main(distance, ts, mu, E, width, D, alpha, r_0, t_0, n_state, _type, shots, gpath):
     res = np.zeros([len(ts), 7, len(distance)])
     exacts = np.zeros([len(ts), 7, len(distance)])
     for i, t in enumerate(ts):
         for m, dist in enumerate(distance):
-        #dist = 1.2
-            states_exps = []
-            opt = minimize(real_cost_function, (0,0),
-                    args=(shots, t, mu, E, width, dist, 2.79, 0.72/0.7, 2*0.7, -0.15, provider.get_backend(backend)),
-                    method="SLSQP",
-                    callback=callback,
-                    #tol=1e-3,
-                    bounds=((-np.pi, np.pi), (-np.pi, np.pi)))
-            res[i, :, m] = np.sort(np.array(states_exps).reshape(-1, 7)[-1])
+            if _type == "simulator":
+                opt = minimize(sim_cost_function, (0,0),
+                        args=(shots, t, mu, E, width, dist, D, alpha, r_0, t_0),
+                        method="SLSQP",
+                        #tol=1e-3,
+                        bounds=((-np.pi, np.pi), (-np.pi, np.pi)))
+            elif _type == "noise_simulator":
+                opt = minimize(noisesim_cost_function, (0,0),
+                        args=(shots, t, mu, E, width, dist, D, alpha, r_0, t_0),
+                        method="SLSQP",
+                        #tol=1e-3,
+                        bounds=((-np.pi, np.pi), (-np.pi, np.pi)))
+            elif _type == "real":
+                opt = minimize(real_cost_function, (0,0),
+                        args=(shots, t, mu, E, width, dist, D, alpha, r_0, t_0),
+                        method="SLSQP",
+                        #tol=1e-3,
+                        bounds=((-np.pi, np.pi), (-np.pi, np.pi)))
+            else:
+                print("please choose a suitable calculation type")
+            res[i, :, m] = np.sort(np.array(get_otptimized_exps(opt.x, _type, shots, t, mu, E, width, dist, D, alpha, r_0, t_0)))
             exacts[i, :, m] = np.sort(LA.eig(get_quasi_floquet_matrix(t, mu, E, \
-                                                    morse_pot(dist, 2.79, 0.72/0.7, 2*0.7), \
-                                                    morse_pot_u(dist, 2.79, 0.72/0.7, 2*0.7, -0.15), width, 3))[0])
+                                                    morse_pot(dist, D, alpha, r_0), \
+                                                    morse_pot_u(dist, D, alpha, r_0, t_0), width, n_state))[0])
     get_graph(res, exacts, gpath)
 
 
@@ -401,16 +454,23 @@ def get_graph(res, exacts, gpath):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Get Floquet energies using Quantum Computer')
+    parser.add_argument('type', type=str, help='an integer for the accumulator')
+    args = parser.parse_args()
+
     mu = 1
     E = 0.8 #5.337e-3
     delta = 1
     omega = 1
     width = 100
     n_states = 3
-    ts = [0, 150, 200, 300]
+    ts = [0]#, 150, 200, 300]
     distance = np.linspace(0.45, 6, 70)
+    D = 2.79
+    alpha = 0.72/0.7
+    r_0 = 2*0.7
+    t_0 = -0.15
     shots = 10000
-    backend = "ibm_kawasaki"
-    gpath = "floquet_77_result.png"
+    gpath = "floquet_result_{}.png".format(args.type)
 
-    main(distance, ts, mu, E, width, shots, backend, gpath)
+    main(distance, ts, mu, E, width, D, alpha, r_0, t_0, n_states, args.type, shots, gpath)
