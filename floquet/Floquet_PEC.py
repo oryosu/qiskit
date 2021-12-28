@@ -386,7 +386,7 @@ def get_otptimized_exps(thetas, _type, shots, t, mu, E, width, dist, D, alpha, r
         off_exps = [res_process_exp(r, shots) for r in ibmsim_real(qcs, backend, shots)]
         dia_exps = [res_process_exp_z(r, shots) for r in ibmsim_real(qcs_z, backend, shots)]
     for i in range(len(dia_exps)):
-        states_exps.append(offdiagonal(off_exps[i:(i+1)*10], 0, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
+        states_exps.append(offdiagonal(off_exps[i:(i+1)*10], t, mu, E, width)+diagonal(dia_exps[i], Eg, Eu))
     return states_exps
 
 def main(distance, ts, mu, E, width, D, alpha, r_0, t_0, n_state, _type, shots, gpath):
@@ -418,6 +418,7 @@ def main(distance, ts, mu, E, width, D, alpha, r_0, t_0, n_state, _type, shots, 
             exacts[i, :, m] = np.sort(LA.eig(get_quasi_floquet_matrix(t, mu, E, \
                                                     morse_pot(dist, D, alpha, r_0), \
                                                     morse_pot_u(dist, D, alpha, r_0, t_0), width, n_state))[0])
+    np.save("res_floquet_{}".format(_type), res)
     get_graph(res, exacts, gpath)
 
 
@@ -431,24 +432,24 @@ def get_graph(res, exacts, gpath):
     axRB = plt.subplot(gs[1,1])
     axLU.set_xlim([0,6])
     axLU.set_ylim([-0.5,4])
-    axLU.plot(distance, res[0,:,:], "k", label="ibm_Kawasaki")
-    axLU.plot(distance, exacts[0,:,:], "k--", label="classical")
-    axLU.legend()
+    axLU.plot(distance, res[0,:,:].T, "k", label="ibm_Kawasaki")
+    axLU.plot(distance, exacts[0,:,:].T, "k--", label="classical")
+    #axLU.legend()
     axRU.set_xlim([0,6])
     axRU.set_ylim([-0.5,4])
-    axRU.plot(distance, res[1,:,:], "k", label="ibm_Kawasaki")
-    axRU.plot(distance, exacts[1,:,:], "k--", label="classical")
-    axRU.legend()
+    axRU.plot(distance, res[1,:,:].T, "k", label="ibm_Kawasaki")
+    axRU.plot(distance, exacts[1,:,:].T, "k--", label="classical")
+    #axRU.legend()
     axLB.set_xlim([0,6])
     axLB.set_ylim([-0.5,4])
-    axLB.plot(distance, res[2,:,:], "k", label="ibm_Kawasaki")
-    axLB.plot(distance, exacts[2,:,:], "k--", label="classical")
-    axLB.legend()
+    axLB.plot(distance, res[2,:,:].T, "k", label="ibm_Kawasaki")
+    axLB.plot(distance, exacts[2,:,:].T, "k--", label="classical")
+    #axLB.legend()
     axRB.set_xlim([0,6])
     axRB.set_ylim([-0.5,4])
-    axRB.plot(distance, res[3,:,:], "k", label="ibm_Kawasaki")
-    axRB.plot(distance, exacts[3,:,:], "k--", label="classical")
-    axRB.legend()
+    axRB.plot(distance, res[3,:,:].T, "k", label="ibm_Kawasaki")
+    axRB.plot(distance, exacts[3,:,:].T, "k--", label="classical")
+    #axRB.legend()
 
     plt.savefig(gpath)
 
@@ -464,7 +465,7 @@ if __name__ == "__main__":
     omega = 1
     width = 100
     n_states = 3
-    ts = [0]#, 150, 200, 300]
+    ts = [0, 150, 200, 300]
     distance = np.linspace(0.45, 6, 70)
     D = 2.79
     alpha = 0.72/0.7
