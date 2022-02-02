@@ -593,7 +593,7 @@ def main(distance, ts, mu, E, width, D, alpha, r_0, t_0, n_state, _type, shots, 
             Eu = morse_pot_u(dist, D, alpha, r_0, t_0)
             if _type == "simulator":
                 opt = minimize(ssvqe_cost_function, init_theta_list,
-                        args=(t, shots, 10000, mu, E, Eu, Eg, d, D1, D2),
+                        args=(t, shots, 10000, mu, E, Eu, Eg, dist, D1, D2),
                         method="L-BFGS-B",
                         #tol=1e-3,
                         bounds=bounds)
