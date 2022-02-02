@@ -234,7 +234,7 @@ def get_exp_xx_001_010(res_xx, shots):
         exps.append(coef*(value/shots))
     return sum(exps)
 
-def get_exp_yy_001_010(res_yy, shots):
+def get_exp_yy_010_011(res_yy, shots):
     comb = more_itertools.powerset([0,1,2,3])
     exps = []
     for ind in comb:
