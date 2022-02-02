@@ -89,8 +89,13 @@ def get_eigenvalues(re, shots, coef, eigenstate):
         eigenvalues.append(coef*np.dot(vec, eigenstate))
     return eigenvalues
 
-def ibmsim(circ, shots):
-    simulator = Aer.get_backend('qasm_simulator')
+def ibmsim(circ, shots, _type):
+    if _type == "qasm":
+        simulator = Aer.get_backend('qasm_simulator')
+    elif _type == "statevector":
+        simulator = Aer.get_backend('statevector_simulator')
+    else:
+        print("Please choose simulator type; qasm or statevector.")
     return execute(circ, simulator, shots=shots).result().get_counts()
 
 def ibmKawasaki_sim(circ, simulator, noise_model, shots):
@@ -132,17 +137,17 @@ def amplitude(t, width):
     return np.exp(-((t-300)/width)**2)
 
 def get_quasi_floquet_matrix(t, mu, E, Eg, Eu, width, n_states):
-    fm = np.zeros([2*n_states+1, 2*n_states+1], dtype=np.complex)
-    for i in range(2*n_states+1):
+    fm = np.zeros([8, 8], dtype=np.complex)
+    for i in range(8):
         if (i-n_states)%2 == 0:
             fm[i,i] = Eg + (i-n_states)
         else:
             fm[i,i] = Eu + (i-n_states)
-    for j in range(2*n_states+1):
+    for j in range(8):
         fm[j,j-1] = mu*E*amplitude(t, width)
         fm[j-1,j] = mu*E*amplitude(t, width)
-    fm[0,2*n_states] = 0
-    fm[2*n_states,0] = 0
+    fm[0,7] = 0
+    fm[7,0] = 0
     return fm
 
 def time_propagate_population(t, coef_ps, eigenvalues, init, omega, n_states):
