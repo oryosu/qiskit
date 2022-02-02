@@ -146,6 +146,20 @@ def yyx(vs, initial_state, D1, D2):
     qc.measure(qnodes, cnodes)
     return qc
 
+def yxy(vs, initial_state, D1, D2):
+    qnodes = QuantumRegister(6,'qc')
+    cnodes = ClassicalRegister(6,'cr')
+    qc = QuantumCircuit(qnodes, cnodes)
+    if initial_state:
+        for i in initial_state:
+            qc.x(qnodes[i])
+    ansatz(qc, qnodes, vs, D1, D2)
+    qc.rx(np.pi/2, qnodes[3])
+    qc.h(qnodes[4])
+    qc.rx(np.pi/2, qnodes[5])
+    qc.measure(qnodes, cnodes)
+    return qc
+
 def get_exp_x_000_001(res_x, shots):
     comb = more_itertools.powerset([0,1,2,3,4])
     exps = []
